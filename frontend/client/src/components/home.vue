@@ -1,61 +1,82 @@
 <template>
   <div>
     <b-form @submit="onSubmit" @reset="onReset" v-if="show">
-      <b-form-group
-        id="input-group-1"
-        label="Email address:"
-        label-for="input-1"
-        description="We'll never share your email with anyone else."
-      >
-        <b-form-input
-          id="input-1"
-          v-model="form.email"
-          type="email"
-          placeholder="Enter email"
-          required
-        ></b-form-input>
-      </b-form-group>
+      <b-container>
+        <b-card bg-variant="light">
+          <b-form-group
+            label-cols-lg="3"
+            label="Calculate Travel Time"
+            label-size="lg"
+            label-class="font-weight-bold pt-0"
+            class="mb-0"
+          >
+            <div key="">
+              <b-form-group
+                id="input-group-3"
+                label="Departure"
+                label-for="input-3"
+              >
+                <b-form-select
+                  id="input-3"
+                  v-model="form.from"
+                  :options="stationNames"
+                  required
+                ></b-form-select>
+              </b-form-group>
 
-      <b-form-group id="input-group-2" label="Your Name:" label-for="input-2">
-        <b-form-input
-          id="input-2"
-          v-model="form.name"
-          placeholder="Enter name"
-          required
-        ></b-form-input>
-      </b-form-group>
+              <b-form-group
+                id="input-group-4"
+                label="Destination"
+                label-for="input-4"
+              >
+                <b-form-select
+                  id="input-4"
+                  v-model="form.to"
+                  :options="stationNames"
+                  required
+                ></b-form-select>
+              </b-form-group>
 
-      <b-form-group id="input-group-3" label="Departure:" label-for="input-3">
-        <b-form-select
-          id="input-3"
-          v-model="form.station1"
-          :options="stations"
-          required
-        ></b-form-select>
-      </b-form-group>
+              <div id="date">
+                <label for="example-datepicker">Choose a date</label>
+                <b-form-datepicker
+                  id="example-datepicker"
+                  v-model="form.date"
+                  class="mb-2"
+                ></b-form-datepicker>
+              </div>
+              <div id="time">
+                <b-time v-model="form.time" locale="en"></b-time>
+              </div>
 
-      <b-form-group id="input-group-4" label="Destination:" label-for="input-4">
-        <b-form-select
-          id="input-4"
-          v-model="form.station2"
-          :options="stations"
-          required
-        ></b-form-select>
-      </b-form-group>
+              <div><br /></div>
 
-      <b-form-group id="input-group-4" v-slot="{ ariaDescribedby }">
-        <b-form-checkbox-group
-          v-model="form.checked"
-          id="checkboxes-4"
-          :aria-describedby="ariaDescribedby"
-        >
-          <b-form-checkbox value="me">Check me out</b-form-checkbox>
-          <b-form-checkbox value="that">Check that out</b-form-checkbox>
-        </b-form-checkbox-group>
-      </b-form-group>
+              <b-button v-b-modal.modal-1 type="submit" variant="primary"
+                >Calculate</b-button
+              >
 
-      <b-button type="submit" variant="primary">Submit</b-button>
-      <b-button type="reset" variant="danger">Reset</b-button>
+              <b-modal
+                v-if="
+                  form.from !== '' &&
+                  form.to !== '' &&
+                  form.date !== '' &&
+                  form.time !== ''
+                "
+                id="modal-1"
+                title="Travel Time"
+                ok-only
+              >
+                <div>
+                  Car: {{ form.travelTimeCar }} <br />
+                  Train: {{ form.travelTimeTrain }}
+                </div>
+              </b-modal>
+
+              <b-button type="reset" variant="danger">Reset</b-button>
+            </div>
+          </b-form-group>
+        </b-card>
+      </b-container>
     </b-form>
     <b-card class="mt-3" header="Form Data Result">
       <pre class="m-0">{{ form }}</pre>
@@ -71,12 +92,16 @@ export default {
   data() {
     return {
       form: {
-        email: "",
-        name: "",
-        station: null,
-        checked: [],
+        from: "",
+        to: "",
+        travelTimeTrain: "",
+        travelTimeCar: "",
+        time: "",
+        date: "",
       },
       stations: [],
+      stationNames: [],
+      connections: [],
       show: true,
     };
   },
@@ -85,8 +110,54 @@ export default {
       axios
         .get("/api/stations")
         .then((responce) => {
-          console.log(responce.data);
           this.stations = responce.data;
+          for (let i = 0; i < this.stations.length; i++) {
+            this.stationNames.push(this.stations[i]["name"]);
+          }
+          this.stationNames.sort();
+        })
+        .catch((err) => {
+          console.error(err);
+        });
+    },
+    getConnectionsResponce(date, time) {
+      axios
+        .get("/api/connections", {
+          params: {
+            _from: this.form.from,
+            to: this.form.to,
+            date: date,
+            time: time,
+          },
+        })
+        .then((responce) => {
+          console.log(responce.data);
+          this.connections = responce.data;
+
+          var date = new Date(null);
+          date.setSeconds(responce.data["duration"]);
+          this.form.travelTimeTrain = date.toISOString().substr(11, 8);
+        })
+        .catch((err) => {
+          console.error(err);
+        });
+    },
+    getHereResponce(lat1, long1, lat2, long2) {
+      axios
+        .get("/api/here", {
+          params: {
+            lat1: lat1,
+            long1: long1,
+            lat2: lat2,
+            long2: long2,
+          },
+        })
+        .then((responce) => {
+          console.log(responce.data);
+
+          var date = new Date(null);
+          date.setSeconds(responce.data);
+          this.form.travelTimeCar = date.toISOString().substr(11, 8);
         })
         .catch((err) => {
           console.error(err);
@@ -94,16 +165,42 @@ export default {
     },
     onSubmit(event) {
       event.preventDefault();
-      alert(JSON.stringify(this.form));
+      var year = this.form.date.substring(2, 4);
+      var month = this.form.date.substring(5, 7);
+      var day = this.form.date.substring(8, 10);
+      var date = day + month + year;
+
+      var hour = this.form.time.substring(0, 2);
+      var minute = this.form.time.substring(3, 5);
+      var time = hour + minute;
+      this.getConnectionsResponce(date, time);
+
+      var lat1 = "";
+      var long1 = "";
+      var lat2 = "";
+      var long2 = "";
+      for (let i = 0; i < this.stations.length; i++) {
+        if (this.stations[i]["name"] == this.form.from) {
+          lat1 = this.stations[i]["locationY"];
+          long1 = this.stations[i]["locationX"];
+        }
+      }
+      for (let i = 0; i < this.stations.length; i++) {
+        if (this.stations[i]["name"] == this.form.to) {
+          lat2 = this.stations[i]["locationY"];
+          long2 = this.stations[i]["locationX"];
+        }
+      }
+      this.getHereResponce(lat1, long1, lat2, long2);
     },
     onReset(event) {
       event.preventDefault();
       // Reset our form values
-      this.form.email = "";
-      this.form.name = "";
-      this.form.station1 = null;
-      this.form.station2 = null;
-      this.form.checked = [];
+      this.form.from = "";
+      this.form.to = "";
+      this.form.travelTimeTrain = "";
+      this.form.date = "";
+      this.form.time = "";
       // Trick to reset/clear native browser form validation state
       this.show = false;
       this.$nextTick(() => {
