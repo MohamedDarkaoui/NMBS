@@ -37,7 +37,14 @@ class Connections(Resource):
         responses:
           200:
             description: Accepted
+          400:
+            description: to not set
+          404:
+            description: Could not match 'query' with a station id in iRail
+          500:
+            description: Could not match get data
+
         """
         URI = 'https://api.irail.be//connections/?from={}&to={}&date={}&time={}&format=json&alerts=false&results=1'.format(_from,to,date,time)
-
-        return requests.get(URI).json()["connection"][0] , 200
+        request = requests.get(URI)
+        return request.json() , request.status_code

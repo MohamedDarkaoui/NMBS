@@ -2,103 +2,127 @@
   <div>
     <b-form @submit="onSubmit" @reset="onReset" v-if="show">
       <b-container>
-        <b-card bg-variant="light">
-          <b-form-group
-            label-cols-lg="3"
-            label="Calculate Travel Time"
-            label-size="lg"
-            label-class="font-weight-bold pt-0"
-            class="mb-0"
-          >
-            <div key="">
-              <b-form-group
-                id="input-group-3"
-                label="Departure"
-                label-for="input-3"
-              >
-                <b-form-select
-                  id="input-3"
-                  v-model="form.from"
-                  :options="stationNames"
-                  required
-                ></b-form-select>
-              </b-form-group>
+        <b-form-group
+          label-cols-lg="3"
+          label="Calculate Travel Time"
+          label-size="lg"
+          label-class="font-weight-bold pt-0"
+          class="mb-0"
+        >
+          <div key="">
+            <b-form-group
+              id="input-group-3"
+              label="Departure"
+              label-for="input-3"
+            >
+              <b-form-select
+                id="input-3"
+                v-model="form.from"
+                :options="stationNames"
+                required
+              ></b-form-select>
+            </b-form-group>
 
-              <b-form-group
-                id="input-group-4"
-                label="Destination"
-                label-for="input-4"
-              >
-                <b-form-select
-                  id="input-4"
-                  v-model="form.to"
-                  :options="stationNames"
-                  required
-                ></b-form-select>
-              </b-form-group>
+            <b-form-group
+              id="input-group-4"
+              label="Destination"
+              label-for="input-4"
+            >
+              <b-form-select
+                id="input-4"
+                v-model="form.to"
+                :options="stationNames"
+                required
+              ></b-form-select>
+            </b-form-group>
 
-              <div id="date">
-                <label for="example-datepicker">Choose a date</label>
-                <b-form-datepicker
-                  id="example-datepicker"
-                  v-model="form.date"
-                  class="mb-2"
-                ></b-form-datepicker>
-              </div>
-              <div id="time">
-                <b-time v-model="form.time" locale="en"></b-time>
-              </div>
-
-              <div><br /></div>
-
-              <b-button v-b-modal.modal-1 type="submit" variant="primary"
-                >Calculate</b-button
-              >
-
-              <b-modal
-                v-if="
-                  form.from !== '' &&
-                  form.to !== '' &&
-                  form.date !== '' &&
-                  form.time !== ''
-                "
-                id="modal-1"
-                title="Travel Time"
-                ok-only
-              >
-                <div>
-                  Car: {{ form.travelTimeCar }} <br />
-                  Train: {{ form.travelTimeTrain }}
-                </div>
-              </b-modal>
-
-              <b-button type="reset" variant="danger">Reset</b-button>
+            <div id="date">
+              <label for="example-datepicker">Choose a date</label>
+              <b-form-datepicker
+                id="example-datepicker"
+                v-model="form.date"
+                class="mb-2"
+              ></b-form-datepicker>
             </div>
-          </b-form-group>
-        </b-card>
+            <div id="time">
+              <b-time v-model="form.time" locale="en"></b-time>
+            </div>
+
+            <div><br /></div>
+
+            <b-button type="submit" variant="primary">Calculate</b-button>
+
+            <b-modal id="modal-1" ref="modal" title="Travel Time" ok-only>
+              <div>
+                Car: {{ travelTimeCar }} <br />
+                Train: {{ travelTimeTrain }}
+              </div>
+            </b-modal>
+
+            <b-button type="reset" variant="danger">Reset</b-button>
+          </div>
+          <div id="map">
+            <br />
+            <l-map :zoom="zoom" :center="center">
+              <l-tile-layer
+                :url="url"
+                :attribution="attribution"
+              ></l-tile-layer>
+              <l-marker
+                v-if="form.marker1 !== ''"
+                :lat-lng="form.marker1"
+              ></l-marker>
+              <l-marker
+                v-if="form.marker2 !== ''"
+                :lat-lng="form.marker2"
+              ></l-marker>
+            </l-map>
+          </div>
+        </b-form-group>
       </b-container>
     </b-form>
-    <b-card class="mt-3" header="Form Data Result">
-      <pre class="m-0">{{ form }}</pre>
-    </b-card>
   </div>
 </template>
 
 <script>
 import axios from "axios";
+import L from "leaflet";
+import { LMap, LTileLayer, LMarker } from "vue2-leaflet";
+import "leaflet/dist/leaflet.css";
+import { Icon } from "leaflet";
+
+delete Icon.Default.prototype._getIconUrl;
+Icon.Default.mergeOptions({
+  iconRetinaUrl: require("leaflet/dist/images/marker-icon-2x.png"),
+  iconUrl: require("leaflet/dist/images/marker-icon.png"),
+  shadowUrl: require("leaflet/dist/images/marker-shadow.png"),
+});
 
 export default {
   name: "HomeWord",
+  components: {
+    LMap,
+    LTileLayer,
+    LMarker,
+  },
   data() {
     return {
       form: {
         from: "",
         to: "",
-        travelTimeTrain: "",
-        travelTimeCar: "",
         time: "",
         date: "",
+        marker1: "",
+        marker2: "",
       },
+
+      zoom: 13,
+      center: L.latLng(51.2213, 4.4051),
+      url: "http://{s}.tile.osm.org/{z}/{x}/{y}.png",
+      attribution:
+        '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors',
+      travelTimeTrain: "",
+      travelTimeCar: "",
       stations: [],
       stationNames: [],
       connections: [],
@@ -106,11 +130,11 @@ export default {
     };
   },
   methods: {
-    getStationResponce() {
+    getStationresponse() {
       axios
         .get("/api/stations")
-        .then((responce) => {
-          this.stations = responce.data;
+        .then((response) => {
+          this.stations = response.data["station"];
           for (let i = 0; i < this.stations.length; i++) {
             this.stationNames.push(this.stations[i]["name"]);
           }
@@ -120,7 +144,7 @@ export default {
           console.error(err);
         });
     },
-    getConnectionsResponce(date, time) {
+    getConnectionsresponse(date, time) {
       axios
         .get("/api/connections", {
           params: {
@@ -130,19 +154,24 @@ export default {
             time: time,
           },
         })
-        .then((responce) => {
-          console.log(responce.data);
-          this.connections = responce.data;
-
+        .then((response) => {
+          if (response.status !== 200) {
+            console.log("STATUS");
+            console.log(response.status);
+            this.$alert("Not possible to calculate");
+            this.onReset();
+            return;
+          }
+          this.connections = response.data["connection"][0];
           var date = new Date(null);
-          date.setSeconds(responce.data["duration"]);
-          this.form.travelTimeTrain = date.toISOString().substr(11, 8);
+          date.setSeconds(this.connections["duration"]);
+          this.travelTimeTrain = date.toISOString().substr(11, 8);
         })
-        .catch((err) => {
-          console.error(err);
+        .catch(() => {
+          this.$alert("Not possible to calculate by train");
         });
     },
-    getHereResponce(lat1, long1, lat2, long2) {
+    getHereresponse(lat1, long1, lat2, long2, date) {
       axios
         .get("/api/here", {
           params: {
@@ -150,17 +179,36 @@ export default {
             long1: long1,
             lat2: lat2,
             long2: long2,
+            depTime: date,
           },
         })
-        .then((responce) => {
-          console.log(responce.data);
-
+        .then((response) => {
+          console.log(response.data);
+          if (response.status !== 200) {
+            console.log("STATUS");
+            console.log(response.status);
+            this.$alert("Not possible to calculate by car");
+            return;
+          }
+          let durations = [];
+          for (var route in response.data["routes"]) {
+            let dur = 0;
+            for (var section in response.data["routes"][route]["sections"]) {
+              dur += parseInt(
+                response.data["routes"][route]["sections"][section]["summary"][
+                  "duration"
+                ]
+              );
+            }
+            durations.push(dur);
+          }
+          var duration = Math.min(durations);
           var date = new Date(null);
-          date.setSeconds(responce.data);
-          this.form.travelTimeCar = date.toISOString().substr(11, 8);
+          date.setSeconds(duration);
+          this.travelTimeCar = date.toISOString().substr(11, 8);
         })
-        .catch((err) => {
-          console.error(err);
+        .catch(() => {
+          this.$alert("Not possible to calculate by car");
         });
     },
     onSubmit(event) {
@@ -173,8 +221,12 @@ export default {
       var hour = this.form.time.substring(0, 2);
       var minute = this.form.time.substring(3, 5);
       var time = hour + minute;
-      this.getConnectionsResponce(date, time);
+      this.getConnectionsresponse(date, time);
 
+      year = "20" + year;
+      var formattedDate =
+        year + "-" + month + "-" + day + "T" + hour + ":" + minute + ":00";
+      console.log(formattedDate);
       var lat1 = "";
       var long1 = "";
       var lat2 = "";
@@ -191,16 +243,28 @@ export default {
           long2 = this.stations[i]["locationX"];
         }
       }
-      this.getHereResponce(lat1, long1, lat2, long2);
+      this.form.marker1 = L.latLng(lat1, long1);
+      this.form.marker2 = L.latLng(lat2, long2);
+      this.getHereresponse(lat1, long1, lat2, long2, formattedDate);
+      if (
+        this.form.from != "" &&
+        this.form.to != "" &&
+        this.form.date != "" &&
+        this.form.time != ""
+      ) {
+        this.$refs["modal"].show();
+      }
     },
-    onReset(event) {
-      event.preventDefault();
+    onReset() {
       // Reset our form values
       this.form.from = "";
       this.form.to = "";
-      this.form.travelTimeTrain = "";
+      this.travelTimeTrain = "";
+      this.travelTimeCar = "";
       this.form.date = "";
       this.form.time = "";
+      this.form.marker1 = "";
+      this.form.marker2 = "";
       // Trick to reset/clear native browser form validation state
       this.show = false;
       this.$nextTick(() => {
@@ -209,7 +273,7 @@ export default {
     },
   },
   created() {
-    this.getStationResponce();
+    this.getStationresponse();
   },
 };
 </script>
@@ -224,24 +288,7 @@ body {
   padding-right: 15px;
   padding-left: 15px;
   width: 100%;
-}
-
-@media (min-width: 576px) {
-  .container {
-    max-width: 540px;
-  }
-}
-
-@media (min-width: 768px) {
-  .container {
-    max-width: 720px;
-  }
-}
-
-@media (min-width: 992px) {
-  .container {
-    max-width: 960px;
-  }
+  height: 100%;
 }
 
 @media (min-width: 1200px) {
@@ -249,9 +296,14 @@ body {
     max-width: 1140px;
   }
 }
-
+@media (min-height: 1200px) {
+  .container {
+    max-height: 1140px;
+  }
+}
 .card-columns .card {
   margin-bottom: 0.75rem;
+  height: 100%;
 }
 
 @media (min-width: 576px) {
@@ -280,5 +332,9 @@ p {
   position: relative;
   display: flex;
   width: 100%;
+}
+#map {
+  height: 70%;
+  margin: 10;
 }
 </style>
